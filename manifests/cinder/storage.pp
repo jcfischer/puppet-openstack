@@ -52,7 +52,11 @@ class openstack::cinder::storage(
       }
     }
     'rbd': {
+      class { 'cinder::volume::rbd':
+        rbd_user => $cinder_rbd_user,
+        rbd_pool => $cinder_rbd_pool,
 
+      }
     }
     default:  {
       warning("Unsupported volume driver: ${volume_driver}, make sure you are configuring this yourself")
