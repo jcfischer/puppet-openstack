@@ -63,6 +63,7 @@ class openstack::keystone (
   $verbose                  = false,
   $debug                    = false,
   $bind_host                = '0.0.0.0',
+  $public_protocol          = 'http',
   $region                   = 'RegionOne',
   $internal_address         = false,
   $admin_address            = false,
@@ -209,6 +210,7 @@ class openstack::keystone (
       admin_address    => $admin_real,
       internal_address => $internal_real,
       region           => $region,
+      public_protocol  => $public_protocol,
     }
 
     # Configure Glance endpoint in Keystone
@@ -219,6 +221,7 @@ class openstack::keystone (
         admin_address    => $glance_admin_real,
         internal_address => $glance_internal_real,
         region           => $region,
+        public_protocol  => $public_protocol,
       }
     }
 
@@ -232,6 +235,7 @@ class openstack::keystone (
         region           => $region,
         # indicates that we should not create endpoints for nova-volumes
         cinder           => true,
+        public_protocol  => $public_protocol,
       }
     }
 
@@ -243,6 +247,7 @@ class openstack::keystone (
         admin_address    => $cinder_admin_real,
         internal_address => $cinder_internal_real,
         region           => $region,
+        public_protocol  => $public_protocol,
       }
     }
     if $quantum {
@@ -252,6 +257,7 @@ class openstack::keystone (
         admin_address    => $quantum_admin_real,
         internal_address => $quantum_internal_real,
         region           => $region,
+        public_protocol  => $public_protocol,
       }
     }
 
@@ -268,6 +274,7 @@ class openstack::keystone (
         internal_address => $swift_internal_real,
         address          => $swift_public_real,
         region           => $region,
+        public_protocol  => $public_protocol,
       }
     }
   }
