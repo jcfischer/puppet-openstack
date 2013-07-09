@@ -127,6 +127,13 @@ class openstack::controller (
   $keystone_admin_tenant   = 'admin',
   $keystone_bind_address   = '0.0.0.0',
   $region                  = 'RegionOne',
+  # Ssl for keystone
+  $ssl_enabled             = false,
+  $certfile                = false,
+  $keyfile                 = false,
+  $ca_certs                = false,
+  $cert_required           = true,
+  $public_protocol         = 'http',
   # Glance
   $glance_db_user          = 'glance',
   $glance_db_dbname        = 'glance',
@@ -284,6 +291,13 @@ class openstack::controller (
     swift_public_address  => $swift_public_address,
     enabled               => $enabled,
     bind_host             => $keystone_bind_address,
+    # Ssl for keystone
+    ssl_enabled           => $ssl_enabled,
+    certfile              => $certfile,
+    keyfile               => $keyfile,
+    ca_certs              => $ca_certs,
+    cert_required         => $cert_required,
+    public_protocol       => $public_protocol,
   }
 
 
