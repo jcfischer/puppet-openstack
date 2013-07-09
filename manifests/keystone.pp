@@ -88,6 +88,13 @@ class openstack::keystone (
   $quantum                  = true,
   $swift                    = false,
   $enabled                  = true
+
+  # Add the possibility to enable ssl for keystone
+  $ssl_enabled              = false,
+  $certfile                 = false,
+  $keyfile                  = false,
+  $ca_certs                 = false,
+  $cert_required            = true
 ) {
 
   # Install and configure Keystone
@@ -203,6 +210,49 @@ class openstack::keystone (
       password     => $admin_password,
       admin_tenant => $admin_tenant,
     }
+
+    # set-up ssl
+    if (ssl_enabled) {
+      if (!$certfile||!$keyfile||!$ca_certs) {
+        fail("In order to set-up ssl for keystone correctly you must provide a certfile a keyfile and ca_certs")
+      } else {
+      keystone_config {
+        'SSL/enable':        => $ssl_enabled;
+        'SSL/certfile':      => $certfile;
+        'SSL/keyfile':       => $keyfile;
+        'SSL/ca_certs':      => $ca_certs;
+        'SSL/cert_required': => $certs_required;
+      }
+      file { ['/etc/keystone/ssl/private', '/etc/keystone/ssl/certs']:
+        ensure  => directory,
+        mode    => '0751',
+      }
+      file { 'key':
+        path    => $keyfile,
+        owner   => 'keystone',
+        group   => 'keystone',
+        mode    => '0400',
+        ensure  => 'file',
+        source  => 'puppet:///openstack/keystonekey.pem',
+      }
+      file { 'cert':
+        path    => $certfile,
+        owner   => 'keystone',
+        group   => 'keystone',
+        mode    => '0644',
+        ensure  => 'file',
+        source  => 'puppet:///openstack/keystonecert.pem',
+      }
+      file { 'ca_certs':
+        path    => $ca_certs,
+        owner   => 'keystone',
+        group   => 'keystone',
+        mode    => '0644',
+        ensure  => 'file',
+        source  => 'puppet:///openstack/keystone_ca_certs.pem',
+      }
+    }
+  }
 
     # Setup the Keystone Identity Endpoint
     class { 'keystone::endpoint':
