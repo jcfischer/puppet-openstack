@@ -15,7 +15,6 @@ describe 'openstack::keystone' do
       :public_address         => '127.0.0.1',
       :db_host                => '127.0.0.1',
       :admin_email            => 'root@localhost',
-      :public_protocol        => 'http'
     }
   end
 
@@ -40,7 +39,6 @@ describe 'openstack::keystone' do
         :admin_token    => 'token',
         :enabled        => true,
         :sql_connection => 'mysql://keystone:pass@127.0.0.1/keystone',
-        :public_protocol=> 'https'
 
       )
       [ 'glance', 'cinder', 'quantum' ].each do |type|
@@ -104,4 +102,34 @@ describe 'openstack::keystone' do
     end
   end
 
+  describe 'with ssl enabled' do
+
+    describe 'without required parameters' do
+      let :params do
+        required_params.merge(:ssl_enabled => true)
+      end
+      it 'should fail' do
+        expect do
+          subject
+        end.to raise_error(Puppet::Error, /In order to set-up ssl for keystone correctly/)
+      end
+    end
+
+    describe 'with required parameters' do
+      let :params do
+        required_params.merge(:ssl_enabled => true,
+                              :keyfile     => '/etc/keystone/ssl/private/keystonekey.pem',
+                              :certfile    => '/etc/keystone/ssl/certs/keystonecert.pem',
+                              :ca_certs    => '/etc/keystone/ssl/certs/keystone_ca.cert'
+                              )
+      end
+      it 'should setup the files' do
+        should contain_class('').with(
+
+               )
+        end
+      end
+    end
+
+  end
 end
