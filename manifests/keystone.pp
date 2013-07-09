@@ -186,14 +186,15 @@ class openstack::keystone (
   }
 
   class { '::keystone':
-    verbose        => $verbose,
-    debug          => $debug,
-    bind_host      => $bind_host,
-    idle_timeout   => $idle_timeout,
-    catalog_type   => 'sql',
-    admin_token    => $admin_token,
-    enabled        => $enabled,
-    sql_connection => $sql_conn,
+    verbose         => $verbose,
+    debug           => $debug,
+    bind_host       => $bind_host,
+    idle_timeout    => $idle_timeout,
+    catalog_type    => 'sql',
+    admin_token     => $admin_token,
+    enabled         => $enabled,
+    sql_connection  => $sql_conn,
+    public_protocol => $public_protocol,
   }
 
   if ($enabled) {

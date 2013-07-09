@@ -14,7 +14,8 @@ describe 'openstack::keystone' do
       :quantum_user_password  => 'pass',
       :public_address         => '127.0.0.1',
       :db_host                => '127.0.0.1',
-      :admin_email            => 'root@localhost'
+      :admin_email            => 'root@localhost',
+      :public_protocol        => 'http'
     }
   end
 
@@ -38,7 +39,9 @@ describe 'openstack::keystone' do
         :catalog_type   => 'sql',
         :admin_token    => 'token',
         :enabled        => true,
-        :sql_connection => 'mysql://keystone:pass@127.0.0.1/keystone'
+        :sql_connection => 'mysql://keystone:pass@127.0.0.1/keystone',
+        :public_protocol=> 'https'
+
       )
       [ 'glance', 'cinder', 'quantum' ].each do |type|
         should contain_class("#{type}::keystone::auth").with(
@@ -46,7 +49,8 @@ describe 'openstack::keystone' do
           :public_address   => params[:public_address],
           :admin_address    => params[:public_address],
           :internal_address => params[:public_address],
-          :region           => 'RegionOne'
+          :region           => 'RegionOne',
+          :public_protocol  => 'http'
         )
       end
       should contain_class('nova::keystone::auth').with(
@@ -55,7 +59,8 @@ describe 'openstack::keystone' do
         :admin_address    => params[:public_address],
         :internal_address => params[:public_address],
         :region           => 'RegionOne',
-        :cinder           => true
+        :cinder           => true,
+        :public_protocol  => 'http'
       )
     end
   end
