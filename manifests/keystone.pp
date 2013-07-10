@@ -217,11 +217,11 @@ class openstack::keystone (
         fail("In order to set-up ssl for keystone correctly you must provide a certfile a keyfile and ca_certs")
       } else {
       keystone_config {
-        'SSL/enable':        value => $ssl_enabled;
-        'SSL/certfile':      value => $certfile;
-        'SSL/keyfile':       value => $keyfile;
-        'SSL/ca_certs':      value => $ca_certs;
-        'SSL/cert_required': value => $certs_required;
+        'ssl/enable':        value => $ssl_enabled;
+        'ssl/certfile':      value => $certfile;
+        'ssl/keyfile':       value => $keyfile;
+        'ssl/ca_certs':      value => $ca_certs;
+        'ssl/cert_required': value => $certs_required;
       }
       # You will have to provide the actual files for the certificates
       # and place them in the locations indicated above. It makes sense
