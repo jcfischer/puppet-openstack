@@ -115,21 +115,5 @@ describe 'openstack::keystone' do
       end
     end
 
-    describe 'with required parameters' do
-      let :params do
-        required_params.merge(:ssl_enabled => true,
-                              :keyfile     => '/etc/keystone/ssl/private/keystonekey.pem',
-                              :certfile    => '/etc/keystone/ssl/certs/keystonecert.pem',
-                              :ca_certs    => '/etc/keystone/ssl/certs/keystone_ca.cert'
-                              )
-      end
-      it 'should setup the files' do
-        should contain_class('').with(
-
-               )
-        end
-      end
-    end
-
   end
 end
