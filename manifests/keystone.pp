@@ -223,34 +223,40 @@ class openstack::keystone (
         'SSL/ca_certs':      value => $ca_certs;
         'SSL/cert_required': value => $certs_required;
       }
-      file { ['/etc/keystone/ssl/private', '/etc/keystone/ssl/certs']:
-        ensure  => directory,
-        mode    => '0751',
-      }
-      file { 'key':
-        path    => $keyfile,
-        owner   => 'keystone',
-        group   => 'keystone',
-        mode    => '0400',
-        ensure  => 'file',
-        source  => 'puppet:///openstack/keystonekey.pem',
-      }
-      file { 'cert':
-        path    => $certfile,
-        owner   => 'keystone',
-        group   => 'keystone',
-        mode    => '0644',
-        ensure  => 'file',
-        source  => 'puppet:///openstack/keystonecert.pem',
-      }
-      file { 'ca_certs':
-        path    => $ca_certs,
-        owner   => 'keystone',
-        group   => 'keystone',
-        mode    => '0644',
-        ensure  => 'file',
-        source  => 'puppet:///openstack/keystone_ca_certs.pem',
-      }
+      # You will have to provide the actual files for the certificates
+      # and place them in the locations indicated above. It makes sense
+      # to do that in your site.pp
+      #
+      # Here is an example of how that could look like
+
+      # file { ['/etc/keystone/ssl/private', '/etc/keystone/ssl/certs']:
+      #   ensure  => directory,
+      #   mode    => '0751',
+      # }
+      # file { 'key':
+      #   path    => $keyfile,
+      #   owner   => 'keystone',
+      #   group   => 'keystone',
+      #   mode    => '0400',
+      #   ensure  => 'file',
+      #   source  => 'puppet:///openstack/keystonekey.pem',
+      # }
+      # file { 'cert':
+      #   path    => $certfile,
+      #   owner   => 'keystone',
+      #   group   => 'keystone',
+      #   mode    => '0644',
+      #   ensure  => 'file',
+      #   source  => 'puppet:///openstack/keystonecert.pem',
+      # }
+      # file { 'ca_certs':
+      #   path    => $ca_certs,
+      #   owner   => 'keystone',
+      #   group   => 'keystone',
+      #   mode    => '0644',
+      #   ensure  => 'file',
+      #   source  => 'puppet:///openstack/keystone_ca_certs.pem',
+      # }
     }
   }
 
