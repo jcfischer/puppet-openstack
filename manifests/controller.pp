@@ -14,6 +14,12 @@
 # [keystone_admin_token] Admin token for keystone.
 # [keystone_bind_address] Address that keystone api service should bind to.
 #   Optional. Defaults to '0.0.0.0'.
+# [ssl_enabled] Set to true to enable keystone ssl
+# [certfile] The path/filename for the SSL cert file
+# [keyfile] The path/filename for the SSL key file
+# [ca_certs] The path/filename for the SSL CA file
+# [cert_required] use client certificates for connecting
+# [public_protocol] set to https if SSL is enabled
 # [glance_db_password] Glance DB password.
 # [glance_user_password] Glance service user password.
 # [nova_db_password] Nova DB password.
@@ -314,6 +320,7 @@ class openstack::controller (
     backend          => $glance_backend,
     swift_store_user => $swift_store_user,
     swift_store_key  => $swift_store_key,
+    swift_store_auth_address => "${public_protocol}://127.0.0.1:5000/v2.0/",
     enabled          => $enabled,
   }
 
@@ -367,6 +374,7 @@ class openstack::controller (
     vnc_enabled             => $vnc_enabled,
     vncproxy_host           => $vncproxy_host_real,
     # General
+    public_protocol         => $public_protocol,
     verbose                 => $verbose,
     enabled                 => $enabled,
   }
@@ -413,6 +421,7 @@ class openstack::controller (
       shared_secret         => $metadata_shared_secret,
       # Keystone
       keystone_host         => $keystone_host,
+      # auth_url              => "${public_protocol}://${keystone_host}:35357/v2.0",
       # General
       enabled               => $enabled,
       enable_server         => $enable_quantum_server,

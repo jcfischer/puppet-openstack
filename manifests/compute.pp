@@ -7,6 +7,8 @@
 #   Whether unmanaged nova.conf entries should be purged.
 #   (optional) Defaults to false.
 #
+# [public_protocol]
+#   If keystone is configured for SSL, set this to 'https'
 # === Examples
 #
 # class { 'openstack::nova::compute':
@@ -77,6 +79,7 @@ class openstack::compute (
   $cinder_rbd_user               = 'volumes',
   $cinder_rbd_pool               = 'volumes',
   # General
+  $public_protocol               = 'http',
   $migration_support             = false,
   $verbose                       = false,
   $enabled                       = true
@@ -221,10 +224,10 @@ class openstack::compute (
     class { 'nova::network::quantum':
       quantum_admin_password    => $quantum_user_password,
       quantum_auth_strategy     => 'keystone',
-      quantum_url               => "http://${quantum_host}:9696",
+      quantum_url               => "${public_protocol}://${quantum_host}:9696",
       quantum_admin_username    => $quantum_admin_user,
       quantum_admin_tenant_name => $quantum_admin_tenant_name,
-      quantum_admin_auth_url    => "http://${keystone_host}:35357/v2.0",
+      quantum_admin_auth_url    => "${public_protocol}://${keystone_host}:35357/v2.0",
     }
 
   }

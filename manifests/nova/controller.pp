@@ -74,6 +74,7 @@ class openstack::nova::controller (
   # Keystone
   $keystone_host             = '127.0.0.1',
   # General
+  $public_protocol           = 'http',
   $verbose                   = false,
   $enabled                   = true
 ) {
@@ -182,10 +183,10 @@ class openstack::nova::controller (
     class { 'nova::network::quantum':
       quantum_admin_password    => $quantum_user_password,
       quantum_auth_strategy     => 'keystone',
-      quantum_url               => "http://${keystone_host}:9696",
+      quantum_url               => "${public_protocol}://${keystone_host}:9696",
       quantum_admin_tenant_name => 'services',
       quantum_admin_username    => 'quantum',
-      quantum_admin_auth_url    => "http://${keystone_host}:35357/v2.0",
+      quantum_admin_auth_url    => "${public_protocol}://${keystone_host}:35357/v2.0",
     }
   }
 
