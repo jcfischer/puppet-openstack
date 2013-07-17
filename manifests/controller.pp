@@ -466,7 +466,7 @@ class openstack::controller (
       cache_server_port => $cache_server_port,
       horizon_app_links => $horizon_app_links,
       keystone_host     => $keystone_host,
-      keystone_schema   => $public_protocol,
+      keystone_scheme   => $public_protocol,
     }
   }
 
