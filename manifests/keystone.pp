@@ -105,7 +105,7 @@ class openstack::keystone (
   }
 
   # I have to do all of this crazy munging b/c parameters are not
-  # set procedurally in Pupet
+  # set procedurally in Puppet
   if($internal_address) {
     $internal_real = $internal_address
   } else {
