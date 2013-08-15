@@ -22,6 +22,8 @@ describe 'openstack::glance' do
       should contain_class('glance::api').with(
         :verbose           => false,
         :debug             => false,
+        :registry_host     => '0.0.0.0',
+        :bind_host         => '0.0.0.0',
         :auth_type         => 'keystone',
         :auth_port         => '35357',
         :auth_host         => '127.0.1.1',
@@ -35,6 +37,7 @@ describe 'openstack::glance' do
       should contain_class('glance::registry').with(
         :verbose           => false,
         :debug             => false,
+        :bind_host         => '0.0.0.0',
         :auth_host         => '127.0.1.1',
         :auth_port         => '35357',
         :auth_type         => 'keystone',
@@ -42,6 +45,7 @@ describe 'openstack::glance' do
         :keystone_user     => 'glance',
         :keystone_password => 'glance_user_pass',
         :sql_connection    => 'mysql://glance:glance_db_pass@127.0.0.1/glance',
+        :sql_idle_timeout  => '3600',
         :enabled           => true
       )
       should contain_class('glance::backend::file')
@@ -108,4 +112,27 @@ describe 'openstack::glance' do
       end
     end
   end
+
+  describe 'when configuring rbd as the backend' do
+
+    before do
+      params.merge!({
+        :backend         => 'rbd',
+        :rbd_store_user  => 'don',
+        :rbd_store_pool  => 'images'
+      })
+    end
+
+    it 'should configure rbd as the backend' do
+      should_not contain_class('glance::backend::file')
+
+      should_not contain_class('glance::backend::swift')
+
+      should contain_class('glance::backend::rbd').with(
+        :rbd_store_user => 'don',
+        :rbd_store_pool => 'images'
+      )
+    end
+  end
+
 end

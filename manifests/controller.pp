@@ -5,9 +5,12 @@
 #
 # [public_interface] Public interface used to route public traffic. Required.
 # [public_address] Public address for public endpoints. Required.
+# [public_protocol] Protocol used by public endpoints. Defaults to 'http'
 # [private_interface] Interface used for vm networking connectivity. Required.
 # [internal_address] Internal address used for management. Required.
 # [mysql_root_password] Root password for mysql server.
+# [sql_idle_timeout] Timeout for sql to reap connections.
+#   (Optional) Defaults to undef.
 # [admin_email] Admin email.
 # [admin_password] Admin password.
 # [keystone_db_password] Keystone database password.
@@ -20,6 +23,8 @@
 # [ca_certs] The path/filename for the SSL CA file
 # [cert_required] use client certificates for connecting
 # [public_protocol] set to https if SSL is enabled
+# [glance_registry_host] Address used by Glance API to find the Glance Registry service.
+#   Optional. Defaults to '0.0.0.0'.
 # [glance_db_password] Glance DB password.
 # [glance_user_password] Glance service user password.
 # [nova_db_password] Nova DB password.
@@ -29,8 +34,17 @@
 #   Whether unmanaged nova.conf entries should be purged.
 #   (optional) Defaults to false.
 #
+# [nova_bind_address]
+#   IP address to use for binding Nova API's.
+#   (optional) Defualts to '0.0.0.0'.
+#
 # [rabbit_password] Rabbit password.
 # [rabbit_user] Rabbit User. Optional. Defaults to openstack.
+# [rabbit_host] IP address to connect to the RabbitMQ Broker. Optional. Defaults to '127.0.0.1'.
+# [rabbit_hosts] An array of IP addresses or Virttual IP address for connecting to a RabbitMQ Cluster.
+#   Optional. Defaults to false.
+# [rabbit_cluster_nodes] An array of Rabbit Broker IP addresses within the Cluster.
+#   Optional. Defaults to false.
 # [rabbit_virtual_host] Rabbit virtual host path for Nova. Defaults to '/'.
 # [network_manager] Nova network manager to use.
 # [fixed_range] Range of ipv4 network for vms.
@@ -44,26 +58,48 @@
 #   Defaults to false.
 # [network_config] Hash that can be used to pass implementation specifc
 #   network settings. Optioal. Defaults to {}
+# [debug] Whether to log services at debug.
 # [verbose] Whether to log services at verbose.
 # Horizon related config - assumes puppetlabs-horizon code
 # [secret_key]          secret key to encode cookies, …
 # [cache_server_ip]     local memcached instance ip
 # [cache_server_port]   local memcached instance port
 # [horizon]             (bool) is horizon installed. Defaults to: true
-# [quantum]             (bool) is quantum installed
+# [neutron]             (bool) is neutron installed
 #   The next is an array of arrays, that can be used to add call-out links to the dashboard for other apps.
 #   There is no specific requirement for these apps to be for monitoring, that's just the defacto purpose.
 #   Each app is defined in two parts, the display name, and the URI
+#
+# [ovs_enable_tunneling]
+#   Enable/disable the Neutron OVS GRE tunneling networking mode.
+#   Optional.  Defaults to true.
+#
 # [metadata_shared_secret]
-#   Shared secret used by nova and quantum to authenticate metadata.
+#   Shared secret used by nova and neutron to authenticate metadata.
 #   (optional) Defaults to false.
+#
+# [physical_network]
+#   Unique name of the physical network used by the Neutron OVS Agent.
+#   All physical networks listed are available for flat and VLAN
+#   provider network creation.
+#
+# [tenant_network_type]
+#   Type of network to allocate for tenant networks
+#   Optional. Defualts to 'gre'.
+#
+# [network_vlan_ranges]
+#   Comma-separated list of <physical_network>[:<vlan_min>:<vlan_max>]
+#   tuples enumerating ranges of VLAN IDs on named physical networks
+#   that are available for allocation.  Only applicable when tenant_network_type
+#   parameter is set to 'vlan'.
+#   Optional. Defaults to 'physnet1:
 #
 # [firewall_driver]
 #   Driver used to implement firewall rules.
-#   (optional) Defaults to 'quantum.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver'.
+#   (optional) Defaults to 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver'.
 #
-# [quantum_auth_url]
-#   Url used to quantum to contact the authentication service.
+# [neutron_auth_url]
+#   Url used to neutron to contact the authentication service.
 #  (optional) Default to http://127.0.0.1:35357/v2.0.
 #
 # [horizon_app_links]     array as in '[ ["Nagios","http://nagios_addr:port/path"],["Ganglia","http://ganglia_addr"] ]'
@@ -78,7 +114,15 @@
 #   (Optional) Defaults to false. Required if swift is set to true.
 #
 # [swift_public_address]
-#   The swift address used to populate the keystone service catalog.
+#   The swift public endpoint address used to populate the keystone service catalog.
+#   (optional). Defaults to false.
+#
+# [swift_internal_address]
+#   The swift internal endpoint address used to populate the keystone service catalog.
+#   (optional). Defaults to false.
+#
+# [swift_admin_address]
+#   The swift admin endpoint address used to populate the keystone service catalog.
 #   (optional). Defaults to false.
 #
 # === Examples
@@ -112,19 +156,21 @@ class openstack::controller (
   $nova_db_password,
   $nova_user_password,
   $secret_key,
-  # cinder and quantum password are not required b/c they are
+  $mysql_root_password,
+  # cinder and neutron password are not required b/c they are
   # optional. Not sure what to do about this.
-  $quantum_user_password   = false,
-  $quantum_db_password     = false,
+  $neutron_user_password   = false,
+  $neutron_db_password     = false,
+  $neutron_core_plugin     = undef,
   $cinder_user_password    = false,
   $cinder_db_password      = false,
   $swift_user_password     = false,
   # Database
   $db_host                 = '127.0.0.1',
   $db_type                 = 'mysql',
-  $mysql_root_password     = 'sql_pass',
   $mysql_account_security  = true,
   $mysql_bind_address      = '0.0.0.0',
+  $sql_idle_timeout        = undef,
   $allowed_hosts           = '%',
   # Keystone
   $keystone_host           = '127.0.0.1',
@@ -141,10 +187,13 @@ class openstack::controller (
   $cert_required           = true,
   $public_protocol         = 'http',
   # Glance
+  $glance_registry_host    = '0.0.0.0',
   $glance_db_user          = 'glance',
   $glance_db_dbname        = 'glance',
   $glance_api_servers      = undef,
   $glance_backend          = 'file',
+  $glance_rbd_store_user   = undef,
+  $glance_rbd_store_pool   = undef,
   # Glance Swift Backend
   $swift_store_user        = 'swift_store_user',
   $swift_store_key         = 'swift_store_key',
@@ -155,6 +204,7 @@ class openstack::controller (
   $nova_db_dbname          = 'nova',
   $purge_nova_config       = false,
   $enabled_apis            = 'ec2,osapi_compute,metadata',
+  $nova_bind_address       = '0.0.0.0',
   # Nova Networking
   $public_interface        = false,
   $private_interface       = false,
@@ -170,6 +220,8 @@ class openstack::controller (
   $network_config          = {},
   # Rabbit
   $rabbit_host             = '127.0.0.1',
+  $rabbit_hosts            = false,
+  $rabbit_cluster_nodes    = false,
   $rabbit_user             = 'openstack',
   $rabbit_virtual_host     = '/',
   # Horizon
@@ -181,6 +233,7 @@ class openstack::controller (
   $vnc_enabled             = true,
   $vncproxy_host           = false,
   # General
+  $debug                   = false,
   $verbose                 = false,
   # cinder
   # if the cinder management components should be installed
@@ -188,24 +241,37 @@ class openstack::controller (
   $cinder_db_user          = 'cinder',
   $cinder_db_dbname        = 'cinder',
   $cinder_bind_address     = '0.0.0.0',
-  # Quantum
-  $quantum                 = true,
+  $manage_volumes          = false,
+  $volume_group            = 'cinder-volumes',
+  $setup_test_volume       = false,
+  $iscsi_ip_address        = '127.0.0.1',
+  # Neutron
+  $neutron                 = true,
+  $physical_network        = 'default',
+  $tenant_network_type     = 'gre',
+  $ovs_enable_tunneling    = true,
+  $ovs_local_ip            = false,
+  $network_vlan_ranges     = undef,
   $bridge_interface        = undef,
   $external_bridge_name    = 'br-ex',
+  $bridge_uplinks          = undef,
+  $bridge_mappings         = undef,
   $enable_ovs_agent        = true,
   $enable_dhcp_agent       = true,
   $enable_l3_agent         = true,
   $enable_metadata_agent   = true,
   $metadata_shared_secret  = false,
-  $firewall_driver         = 'quantum.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver',
-  $quantum_db_user         = 'quantum',
-  $quantum_db_name         = 'quantum',
-  $quantum_auth_url        = 'http://127.0.0.1:35357/v2.0',
-  $enable_quantum_server   = true,
-  $ovs_local_ip            = false,
+  $firewall_driver         = 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver',
+  $neutron_db_user         = 'neutron',
+  $neutron_db_name         = 'neutron',
+  $neutron_auth_url        = 'http://127.0.0.1:35357/v2.0',
+  $enable_neutron_server   = true,
+  $security_group_api      = 'neutron',
   # swift
   $swift                   = false,
   $swift_public_address    = false,
+  $swift_internal_address  = false,
+  $swift_admin_address     = false,
   $enabled                 = true
 ) {
 
@@ -259,10 +325,10 @@ class openstack::controller (
       cinder_db_user         => $cinder_db_user,
       cinder_db_password     => $cinder_db_password,
       cinder_db_dbname       => $cinder_db_dbname,
-      quantum                => $quantum,
-      quantum_db_user        => $quantum_db_user,
-      quantum_db_password    => $quantum_db_password,
-      quantum_db_dbname      => $quantum_db_name,
+      neutron                => $neutron,
+      neutron_db_user        => $neutron_db_user,
+      neutron_db_password    => $neutron_db_password,
+      neutron_db_dbname      => $neutron_db_name,
       allowed_hosts          => $allowed_hosts,
       enabled                => $enabled,
     }
@@ -272,47 +338,63 @@ class openstack::controller (
 
   ####### KEYSTONE ###########
   class { 'openstack::keystone':
-    verbose               => $verbose,
-    db_type               => $db_type,
-    db_host               => $db_host,
-    db_password           => $keystone_db_password,
-    db_name               => $keystone_db_dbname,
-    db_user               => $keystone_db_user,
-    admin_token           => $keystone_admin_token,
-    admin_tenant          => $keystone_admin_tenant,
-    admin_email           => $admin_email,
-    admin_password        => $admin_password,
-    public_address        => $public_address,
-    internal_address      => $internal_address_real,
-    admin_address         => $admin_address_real,
-    region                => $region,
-    glance_user_password  => $glance_user_password,
-    nova_user_password    => $nova_user_password,
-    cinder                => $cinder,
-    cinder_user_password  => $cinder_user_password,
-    quantum               => $quantum,
-    quantum_user_password => $quantum_user_password,
-    swift                 => $swift,
-    swift_user_password   => $swift_user_password,
-    swift_public_address  => $swift_public_address,
-    enabled               => $enabled,
-    bind_host             => $keystone_bind_address,
+    debug                     => $debug,
+    verbose                   => $verbose,
+    db_type                   => $db_type,
+    db_host                   => $db_host,
+    db_password               => $keystone_db_password,
+    db_name                   => $keystone_db_dbname,
+    db_user                   => $keystone_db_user,
+    idle_timeout              => $sql_idle_timeout,
+    admin_token               => $keystone_admin_token,
+    admin_tenant              => $keystone_admin_tenant,
+    admin_email               => $admin_email,
+    admin_password            => $admin_password,
+    public_address            => $public_address,
+    public_protocol           => $public_protocol,
+    internal_address          => $internal_address_real,
+    admin_address             => $admin_address_real,
+    region                    => $region,
+    glance_user_password      => $glance_user_password,
+    glance_internal_address   => $internal_address_real,
+    glance_admin_address      => $admin_address_real,
+    nova_user_password        => $nova_user_password,
+    nova_internal_address     => $internal_address_real,
+    nova_admin_address        => $admin_address_real,
+    cinder                    => $cinder,
+    cinder_user_password      => $cinder_user_password,
+    cinder_internal_address   => $internal_address_real,
+    cinder_admin_address      => $admin_address_real,
+    neutron                   => $neutron,
+    neutron_user_password     => $neutron_user_password,
+    neutron_internal_address  => $internal_address_real,
+    neutron_admin_address     => $admin_address_real,
+    swift                     => $swift,
+    swift_user_password       => $swift_user_password,
+    swift_public_address      => $swift_public_address,
+    swift_internal_address    => $swift_internal_address,
+    swift_admin_address       => $swift_admin_address,
+    enabled                   => $enabled,
+    bind_host                 => $keystone_bind_address,
     # Ssl for keystone
-    ssl_enabled           => $ssl_enabled,
-    certfile              => $certfile,
-    keyfile               => $keyfile,
-    ca_certs              => $ca_certs,
-    cert_required         => $cert_required,
-    public_protocol       => $public_protocol,
+    ssl_enabled               => $ssl_enabled,
+    certfile                  => $certfile,
+    keyfile                   => $keyfile,
+    ca_certs                  => $ca_certs,
+    cert_required             => $cert_required,
+    public_protocol           => $public_protocol,
   }
 
 
   ######## BEGIN GLANCE ##########
   class { 'openstack::glance':
+    debug            => $debug,
     verbose          => $verbose,
     db_type          => $db_type,
     db_host          => $db_host,
+    sql_idle_timeout => $sql_idle_timeout,
     keystone_host    => $keystone_host,
+    registry_host    => $glance_registry_host,
     db_user          => $glance_db_user,
     db_name          => $glance_db_dbname,
     db_password      => $glance_db_password,
@@ -321,6 +403,8 @@ class openstack::controller (
     swift_store_user => $swift_store_user,
     swift_store_key  => $swift_store_key,
     swift_store_auth_address => "${public_protocol}://127.0.0.1:5000/v2.0/",
+    rbd_store_user   => $glance_rbd_store_user,
+    rbd_store_pool   => $glance_rbd_store_pool,
     enabled          => $enabled,
   }
 
@@ -338,6 +422,7 @@ class openstack::controller (
   class { 'openstack::nova::controller':
     # Database
     db_host                 => $db_host,
+    sql_idle_timeout        => $sql_idle_timeout,
     # Network
     network_manager         => $network_manager,
     network_config          => $network_config,
@@ -352,10 +437,11 @@ class openstack::controller (
     multi_host              => $multi_host,
     public_interface        => $public_interface,
     private_interface       => $private_interface,
-    # Quantum
-    quantum                 => $quantum,
-    quantum_user_password   => $quantum_user_password,
+    # Neutron
+    neutron                 => $neutron,
+    neutron_user_password   => $neutron_user_password,
     metadata_shared_secret  => $metadata_shared_secret,
+    security_group_api      => $security_group_api,
     # Nova
     nova_admin_tenant_name  => $nova_admin_tenant_name,
     nova_admin_user         => $nova_admin_user,
@@ -364,9 +450,12 @@ class openstack::controller (
     nova_db_user            => $nova_db_user,
     nova_db_dbname          => $nova_db_dbname,
     enabled_apis            => $enabled_apis,
+    api_bind_address        => $nova_bind_address,
     # Rabbit
     rabbit_user             => $rabbit_user,
     rabbit_password         => $rabbit_password,
+    rabbit_hosts            => $rabbit_hosts,
+    rabbit_cluster_nodes    => $rabbit_cluster_nodes,
     rabbit_virtual_host     => $rabbit_virtual_host,
     # Glance
     glance_api_servers      => $glance_api_servers,
@@ -375,56 +464,77 @@ class openstack::controller (
     vncproxy_host           => $vncproxy_host_real,
     # General
     public_protocol         => $public_protocol,
+    debug                   => $debug,
     verbose                 => $verbose,
     enabled                 => $enabled,
   }
 
-  ######### Quantum Controller Services ########
-  if ($quantum) {
+  ######### Neutron Controller Services ########
+  if ($neutron) {
 
-    if ! $quantum_user_password {
-      fail('quantum_user_password must be set when configuring quantum')
+    if ! $neutron_user_password {
+      fail('neutron_user_password must be set when configuring neutron')
     }
 
-    if ! $quantum_db_password {
-      fail('quantum_db_password must be set when configuring quantum')
+    if ! $neutron_db_password {
+      fail('neutron_db_password must be set when configuring neutron')
     }
 
     if ! $bridge_interface {
-      fail('bridge_interface must be set when configuring quantum')
+      fail('bridge_interface must be set when configuring neutron')
     }
 
-    class { 'openstack::quantum':
+    if ! $bridge_uplinks {
+      $bridge_uplinks_real = ["${external_bridge_name}:${bridge_interface}"]
+    } else {
+      $bridge_uplinks_real = $bridge_uplinks
+    }
+
+    if ! $bridge_mappings {
+      $bridge_mappings_real  = ["${physical_network}:${external_bridge_name}"]
+    } else {
+      $bridge_mappings_real  = $bridge_mappings
+    }
+
+    class { 'openstack::neutron':
       # Database
       db_host               => $db_host,
+      sql_idle_timeout      => $sql_idle_timeout,
       # Rabbit
       rabbit_host           => $rabbit_host,
       rabbit_user           => $rabbit_user,
       rabbit_password       => $rabbit_password,
+      rabbit_hosts          => $rabbit_hosts,
       rabbit_virtual_host   => $rabbit_virtual_host,
-      # Quantum OVS
+      # Neutron OVS
+      tenant_network_type   => $tenant_network_type,
+      network_vlan_ranges   => $network_vlan_ranges,
+      ovs_enable_tunneling  => $ovs_enable_tunneling,
       ovs_local_ip          => $ovs_local_ip_real,
-      bridge_uplinks        => ["${external_bridge_name}:${bridge_interface}"],
-      bridge_mappings       => ["default:${external_bridge_name}"],
+      bridge_uplinks        => $bridge_uplinks_real,
+      bridge_mappings       => $bridge_mappings_real,
       enable_ovs_agent      => $enable_ovs_agent,
       firewall_driver       => $firewall_driver,
       # Database
-      db_name               => $quantum_db_name,
-      db_user               => $quantum_db_user,
-      db_password           => $quantum_db_password,
-      # Quantum agents
+      db_name               => $neutron_db_name,
+      db_user               => $neutron_db_user,
+      db_password           => $neutron_db_password,
+      # Plugin
+      core_plugin           => $neutron_core_plugin,
+      # Neutron agents
       enable_dhcp_agent     => $enable_dhcp_agent,
       enable_l3_agent       => $enable_l3_agent,
       enable_metadata_agent => $enable_metadata_agent,
-      auth_url              => $quantum_auth_url,
-      user_password         => $quantum_user_password,
+      auth_url              => $neutron_auth_url,
+      user_password         => $neutron_user_password,
       shared_secret         => $metadata_shared_secret,
       # Keystone
       keystone_host         => $keystone_host,
       # auth_url              => "${public_protocol}://${keystone_host}:35357/v2.0",
       # General
       enabled               => $enabled,
-      enable_server         => $enable_quantum_server,
+      enable_server         => $enable_neutron_server,
+      debug                 => $debug,
       verbose               => $verbose,
     }
   }
@@ -440,20 +550,26 @@ class openstack::controller (
       fail('Must set cinder user password when setting up a cinder controller')
     }
 
-    class { 'openstack::cinder::controller':
+    class { 'openstack::cinder::all':
       bind_host          => $cinder_bind_address,
+      sql_idle_timeout   => $sql_idle_timeout,
       keystone_auth_host => $keystone_host,
       keystone_password  => $cinder_user_password,
       rabbit_userid      => $rabbit_user,
       rabbit_password    => $rabbit_password,
       rabbit_host        => $rabbit_host,
+      rabbit_hosts       => $rabbit_hosts,
       db_password        => $cinder_db_password,
       db_dbname          => $cinder_db_dbname,
       db_user            => $cinder_db_user,
       db_type            => $db_type,
       db_host            => $db_host,
-      api_enabled        => $enabled,
-      scheduler_enabled  => $enabled,
+      manage_volumes     => $manage_volumes,
+      volume_group       => $volume_group,
+      setup_test_volume  => $setup_test_volume,
+      iscsi_ip_address   => $iscsi_ip_address,
+      enabled            => $enabled,
+      debug              => $debug,
       verbose            => $verbose
     }
   }

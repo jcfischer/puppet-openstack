@@ -12,21 +12,26 @@ describe 'openstack::controller' do
       :admin_email             => 'some_user@some_fake_email_address.foo',
       :admin_password          => 'ChangeMe',
       :rabbit_password         => 'rabbit_pw',
+      :rabbit_cluster_nodes    => false,
       :rabbit_virtual_host     => '/',
       :keystone_db_password    => 'keystone_pass',
       :keystone_admin_token    => 'keystone_admin_token',
+      :glance_registry_host    => '0.0.0.0',
       :glance_db_password      => 'glance_pass',
       :glance_user_password    => 'glance_pass',
+      :nova_bind_address       => '0.0.0.0',
       :nova_db_password        => 'nova_pass',
       :nova_user_password      => 'nova_pass',
       :cinder_db_password      => 'cinder_pass',
       :cinder_user_password    => 'cinder_pass',
       :secret_key              => 'secret_key',
-      :quantum                 => false,
+      :mysql_root_password     => 'sql_pass',
+      :neutron                 => false,
       :vncproxy_host           => '10.0.0.1',
       :nova_admin_tenant_name  => 'services',
       :nova_admin_user         => 'nova',
       :enabled_apis            => 'ec2,osapi_compute,metadata',
+      :physical_network        => 'default'
     }
   end
 
@@ -66,11 +71,11 @@ describe 'openstack::controller' do
         default_params.merge(
           :enabled                => true,
           :db_type                => 'mysql',
-          :quantum                => true,
+          :neutron                => true,
           :metadata_shared_secret => 'secret',
           :bridge_interface       => 'eth1',
-          :quantum_user_password  => 'q_pass',
-          :quantum_db_password    => 'q_db_pass',
+          :neutron_user_password  => 'q_pass',
+          :neutron_db_password    => 'q_db_pass',
           :cinder                 => true
         )
       end
@@ -107,10 +112,10 @@ describe 'openstack::controller' do
            :dbname        => 'cinder',
            :allowed_hosts => '%'
          )
-         should contain_class('quantum::db::mysql').with(
-           :user          => 'quantum',
+         should contain_class('neutron::db::mysql').with(
+           :user          => 'neutron',
            :password      => 'q_db_pass',
-           :dbname        => 'quantum',
+           :dbname        => 'neutron',
            :allowed_hosts => '%'
          )
       end
@@ -120,16 +125,16 @@ describe 'openstack::controller' do
 
     end
 
-    context 'when cinder and quantum are false' do
+    context 'when cinder and neutron are false' do
 
       let :params do
         default_params.merge(
-          :quantum => false,
+          :neutron => false,
           :cinder  => false
         )
       end
       it do
-        should_not contain_class('quantum::db::mysql')
+        should_not contain_class('neutron::db::mysql')
         should_not contain_class('cinder::db::mysql')
       end
 
@@ -150,12 +155,12 @@ describe 'openstack::controller' do
         config_hash['root_password'].should == 'sql_pass'
       end
 
-      ['keystone', 'nova', 'glance', 'cinder', 'quantum'].each do |x|
+      ['keystone', 'nova', 'glance', 'cinder', 'neutron'].each do |x|
         it { should_not contain_class("#{x}::db::mysql") }
       end
     end
 
-    context 'when account secutiry is not enabled' do
+    context 'when account security is not enabled' do
       let :params do
         default_params.merge(
           {:mysql_account_security => false}
@@ -178,9 +183,11 @@ describe 'openstack::controller' do
       it 'should configure default keystone configuration' do
 
         should contain_class('openstack::keystone').with(
-          :swift                => false,
-          :swift_user_password  => false,
-          :swift_public_address => false
+          :swift                  => false,
+          :swift_user_password    => false,
+          :swift_public_address   => false,
+          :swift_internal_address => false,
+          :swift_admin_address    => false
         )
 
         should contain_class('keystone').with(
@@ -199,6 +206,7 @@ describe 'openstack::controller' do
         )
         should contain_class('keystone::endpoint').with(
           :public_address   => '10.0.0.1',
+          :public_protocol  => 'http',
           :internal_address => '127.0.0.1',
           :admin_address    => '127.0.0.1',
           :region           => 'RegionOne'
@@ -212,8 +220,9 @@ describe 'openstack::controller' do
           should contain_class("#{type}::keystone::auth").with(
             :password         => pw,
             :public_address   => '10.0.0.1',
-            :internal_address => '10.0.0.1',
-            :admin_address    => '10.0.0.1',
+            :public_protocol  => 'http',
+            :internal_address => '127.0.0.1',
+            :admin_address    => '127.0.0.1',
             :region           => 'RegionOne'
           )
         end
@@ -221,16 +230,20 @@ describe 'openstack::controller' do
       context 'when configuring swift' do
         before :each do
           params.merge!(
-            :swift                => true,
-            :swift_user_password  => 'foo',
-            :swift_public_address => '10.0.0.2'
+            :swift                  => true,
+            :swift_user_password    => 'foo',
+            :swift_public_address   => '10.0.0.2',
+            :swift_internal_address => '10.0.0.2',
+            :swift_admin_address    => '10.0.0.2'
           )
         end
         it 'should configure swift auth in keystone' do
           should contain_class('openstack::keystone').with(
-            :swift                => true,
-            :swift_user_password  => 'foo',
-            :swift_public_address => '10.0.0.2'
+            :swift                  => true,
+            :swift_user_password    => 'foo',
+            :swift_public_address   => '10.0.0.2',
+            :swift_internal_address => '10.0.0.2',
+            :swift_admin_address    => '10.0.0.2'
           )
         end
       end
@@ -247,6 +260,46 @@ describe 'openstack::controller' do
         should_not contain_class('keystone::endpoint')
         should_not contain_class('glance::keystone::auth')
         should_not contain_class('nova::keystone::auth')
+      end
+    end
+
+    context 'when public_protocol is set to https' do
+
+      let :params do
+        default_params.merge(:public_protocol => 'https')
+      end
+
+      it 'should propagate it to the endpoints' do
+        should contain_class('keystone::endpoint').with(:public_protocol => 'https')
+        should contain_class('glance::keystone::auth').with(:public_protocol => 'https')
+        should contain_class('nova::keystone::auth').with(:public_protocol => 'https')
+        should contain_class('cinder::keystone::auth').with(:public_protocol => 'https')
+      end
+    end
+
+    context 'with different public, internal and admin addresses' do
+      let :params do
+        default_params.merge(
+          :public_address   => '1.1.1.1',
+          :internal_address => '2.2.2.2',
+          :admin_address    => '3.3.3.3'
+        )
+      end
+
+      it 'should set addresses in subclasses' do
+        should contain_class('keystone::endpoint').with(
+          :public_address   => '1.1.1.1',
+          :internal_address => '2.2.2.2',
+          :admin_address    => '3.3.3.3'
+        )
+
+        ['nova', 'cinder', 'glance'].each do |type|
+          should contain_class("#{type}::keystone::auth").with(
+            :public_address   => '1.1.1.1',
+            :internal_address => '2.2.2.2',
+            :admin_address    => '3.3.3.3'
+          )
+        end
       end
     end
   end
@@ -273,6 +326,7 @@ describe 'openstack::controller' do
           :keystone_tenant   => 'services',
           :keystone_user     => 'glance',
           :keystone_password => 'glance_pass',
+          :registry_host     => '0.0.0.0',
           :sql_connection    => 'mysql://glance:glance_pass@127.0.0.1/glance',
           :enabled           => true
         )
@@ -314,11 +368,17 @@ describe 'openstack::controller' do
       let :params do
         default_params.merge(
           :verbose               => false,
+          :debug                 => false,
+          :glance_registry_host  => '127.0.0.2',
           :glance_user_password  => 'glance_pass2',
           :glance_db_password    => 'glance_pass3',
           :db_host               => '127.0.0.2',
+          :sql_idle_timeout      => '30',
           :glance_db_user        => 'dan',
           :glance_db_dbname      => 'name',
+          :glance_backend        => 'rbd',
+          :glance_rbd_store_user => 'myuser',
+          :glance_rbd_store_pool => 'mypool',
           :db_host               => '127.0.0.2'
         )
       end
@@ -327,13 +387,15 @@ describe 'openstack::controller' do
         should contain_class('glance::api').with(
           :verbose           => false,
           :debug             => false,
+          :registry_host     => '127.0.0.2',
           :auth_type         => 'keystone',
           :auth_host         => '127.0.0.1',
           :auth_port         => '35357',
           :keystone_tenant   => 'services',
           :keystone_user     => 'glance',
           :keystone_password => 'glance_pass2',
-          :sql_connection    => 'mysql://dan:glance_pass3@127.0.0.2/name'
+          :sql_connection    => 'mysql://dan:glance_pass3@127.0.0.2/name',
+          :sql_idle_timeout  => '30'
         )
 
         should contain_class('glance::registry').with(
@@ -346,6 +408,21 @@ describe 'openstack::controller' do
           :keystone_user     => 'glance',
           :keystone_password => 'glance_pass2',
           :sql_connection    => "mysql://dan:glance_pass3@127.0.0.2/name"
+        )
+      end
+    end
+
+    context 'when the RBD backend is configured' do
+       let :params do
+        default_params.merge(
+          :glance_backend        => 'rbd',
+          :glance_rbd_store_user => 'myuser',
+          :glance_rbd_store_pool => 'mypool'
+        )
+
+        should contain_class('glance::backend::rbd').with(
+          :rbd_store_user => 'myuser',
+          :rbd_store_pool => 'mypool'
         )
       end
     end
@@ -369,19 +446,22 @@ describe 'openstack::controller' do
       it 'should contain enabled nova services' do
         should_not contain_resources('nova_config').with_purge(true)
         should contain_class('nova::rabbitmq').with(
-          :userid       => 'openstack',
-          :password     => 'rabbit_pw',
-          :virtual_host => '/',
-          :enabled      => true
+          :userid               => 'openstack',
+          :password             => 'rabbit_pw',
+          :cluster_disk_nodes   => false,
+          :virtual_host         => '/',
+          :enabled              => true
         )
         should contain_class('nova').with(
           :sql_connection      => 'mysql://nova:nova_pass@127.0.0.1/nova',
           :rabbit_host         => '127.0.0.1',
+          :rabbit_hosts        => false,
           :rabbit_userid       => 'openstack',
           :rabbit_password     => 'rabbit_pw',
           :rabbit_virtual_host => '/',
           :image_service       => 'nova.image.glance.GlanceImageService',
           :glance_api_servers  => '10.0.0.1:9292',
+          :debug               => false,
           :verbose             => false
         )
         should contain_class('nova::api').with(
@@ -389,7 +469,8 @@ describe 'openstack::controller' do
           :admin_tenant_name => 'services',
           :admin_user        => 'nova',
           :admin_password    => 'nova_pass',
-          :enabled_apis      => 'ec2,osapi_compute,metadata'
+          :enabled_apis      => 'ec2,osapi_compute,metadata',
+          :api_bind_address  => '0.0.0.0'
         )
         should contain_class('nova::cert').with(:enabled => true)
         should contain_class('nova::consoleauth').with(:enabled => true)
@@ -423,8 +504,19 @@ describe 'openstack::controller' do
         should contain_class('nova::vncproxy').with(:enabled => false)
       end
     end
+    context 'when params are overridden' do
+      let :params do
+        default_params.merge(
+          :sql_idle_timeout => '30'
+        )
+      end
+      it 'should override params for nova' do
+        should contain_class('nova').with(
+          :sql_idle_timeout  => '30'
+        )
+      end
+    end
   end
-
 
   context 'config for horizon' do
 
@@ -455,7 +547,8 @@ describe 'openstack::controller' do
       it 'should not contain cinder classes' do
         should_not contain_class('cinder')
         should_not contain_class('cinder::api')
-        should_not contain_class('cinder:"scheduler')
+        should_not contain_class('cinder::scheduler')
+        should_not contain_class('cinder::volume')
       end
     end
 
@@ -465,6 +558,7 @@ describe 'openstack::controller' do
       end
       it 'should configure cinder using defaults' do
         should contain_class('cinder').with(
+          :debug           => false,
           :verbose         => false,
           :sql_connection  => 'mysql://cinder:cinder_pass@127.0.0.1/cinder?charset=utf8',
           :rabbit_password => 'rabbit_pw'
@@ -477,22 +571,28 @@ describe 'openstack::controller' do
     context 'when overriding config' do
       let :params do
         default_params.merge(
+          :debug                => true,
           :verbose              => true,
+          :rabbit_host          => '127.0.0.1',
+          :rabbit_hosts         => false,
           :rabbit_user          => 'rabbituser',
           :rabbit_password      => 'rabbit_pw2',
           :cinder_user_password => 'foo',
           :cinder_db_password   => 'bar',
           :cinder_db_user       => 'baz',
           :cinder_db_dbname     => 'blah',
+          :sql_idle_timeout     => '30',
           :db_host              => '127.0.0.2'
         )
       end
       it 'should configure cinder using defaults' do
         should contain_class('cinder').with(
-          :verbose         => true,
-          :sql_connection  => 'mysql://baz:bar@127.0.0.2/blah?charset=utf8',
-          :rabbit_password => 'rabbit_pw2',
-          :rabbit_userid   => 'rabbituser'
+          :debug            => true,
+          :verbose          => true,
+          :sql_connection   => 'mysql://baz:bar@127.0.0.2/blah?charset=utf8',
+          :sql_idle_timeout => '30',
+          :rabbit_password  => 'rabbit_pw2',
+          :rabbit_userid    => 'rabbituser'
         )
         should contain_class('cinder::api').with_keystone_password('foo')
         should contain_class('cinder::scheduler')
@@ -503,37 +603,46 @@ describe 'openstack::controller' do
 
   context 'network config' do
 
-    context 'when quantum' do
+    context 'when neutron' do
 
       let :params do
         default_params.merge({
-          :quantum => true,
-          :verbose => true,
-          :quantum_user_password  => 'q_pass',
+          :neutron                => true,
+          :debug                  => true,
+          :verbose                => true,
+          :sql_idle_timeout       => '30',
+          :neutron_user_password  => 'q_pass',
           :bridge_interface       => 'eth_27',
           :internal_address       => '10.0.0.3',
-          :quantum_db_password    => 'q_db_pass',
-          :metadata_shared_secret => 'secret'
+          :neutron_db_password    => 'q_db_pass',
+          :metadata_shared_secret => 'secret',
+          :external_bridge_name   => 'br-ex'
         })
       end
 
       it { should_not contain_class('nova::network') }
 
-      it 'should configure quantum' do
+      it { should contain_class('nova::network::neutron').with(:security_group_api => 'neutron') }
 
-        should contain_class('openstack::quantum').with(
+      it 'should configure neutron' do
+
+        should contain_class('openstack::neutron').with(
           :db_host               => '127.0.0.1',
+          :sql_idle_timeout      => '30',
           :rabbit_host           => '127.0.0.1',
+          :rabbit_hosts          => false,
           :rabbit_user           => 'openstack',
           :rabbit_password       => 'rabbit_pw',
           :rabbit_virtual_host   => '/',
+          :tenant_network_type   => 'gre',
+          :ovs_enable_tunneling  => true,
           :ovs_local_ip          => '10.0.0.3',
           :bridge_uplinks        => ["br-ex:eth_27"],
           :bridge_mappings       => ["default:br-ex"],
           :enable_ovs_agent      => true,
-          :firewall_driver       => 'quantum.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver',
-          :db_name               => 'quantum',
-          :db_user               => 'quantum',
+          :firewall_driver       => 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver',
+          :db_name               => 'neutron',
+          :db_user               => 'neutron',
           :db_password           => 'q_db_pass',
           :enable_dhcp_agent     => true,
           :enable_l3_agent       => true,
@@ -544,6 +653,7 @@ describe 'openstack::controller' do
           :keystone_host         => '127.0.0.1',
           :enabled               => true,
           :enable_server         => true,
+          :debug                 => true,
           :verbose               => true
         )
 
@@ -556,7 +666,7 @@ describe 'openstack::controller' do
 
       context 'when multi-host is not set' do
         let :params do
-          default_params.merge(:quantum => false, :multi_host => false)
+          default_params.merge(:neutron => false, :multi_host => false)
         end
         it {should contain_class('nova::network').with(
           :private_interface => 'eth0',
@@ -574,7 +684,7 @@ describe 'openstack::controller' do
 
       context 'when multi-host is set' do
         let :params do
-          default_params.merge(:quantum => false, :multi_host => true)
+          default_params.merge(:neutron => false, :multi_host => true)
         end
         it { should contain_nova_config('DEFAULT/multi_host').with(:value => true)}
         it {should contain_class('nova::network').with(

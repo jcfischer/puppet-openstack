@@ -9,9 +9,20 @@
 #
 # [public_protocol]
 #   If keystone is configured for SSL, set this to 'https'
+# [neutron_firewall_driver]
+#   Driver used to implement Neutron firewalling.
+#   (optional) Defaults to false.
+#
+# [ovs_enable_tunneling]
+#   Enable/disable the Neutron OVS GRE tunneling networking mode.
+#   Optional.  Defaults to true.
+#
+# [rabbit_hosts] An array of IP addresses or Virttual IP address for connecting to a RabbitMQ Cluster.
+#   Optional. Defaults to false.
+#
 # === Examples
 #
-# class { 'openstack::nova::compute':
+# class { 'openstack::compute':
 #   internal_address   => '192.168.2.2',
 #   vncproxy_host      => '192.168.1.1',
 #   nova_user_password => 'changeme',
@@ -38,18 +49,23 @@ class openstack::compute (
   $network_config                = {},
   $multi_host                    = false,
   $enabled_apis                  = 'ec2,osapi_compute,metadata',
-  # Quantum
-  $quantum                       = true,
-  $quantum_user_password         = false,
-  $quantum_admin_tenant_name     = 'services',
-  $quantum_admin_user            = 'quantum',
+  # Neutron
+  $neutron                       = true,
+  $neutron_user_password         = false,
+  $neutron_admin_tenant_name     = 'services',
+  $neutron_admin_user            = 'neutron',
   $enable_ovs_agent              = true,
   $enable_l3_agent               = false,
   $enable_dhcp_agent             = false,
-  $quantum_auth_url              = 'http://127.0.0.1:35357/v2.0',
+  $neutron_auth_url              = 'http://127.0.0.1:35357/v2.0',
   $keystone_host                 = '127.0.0.1',
-  $quantum_host                  = '127.0.0.1',
+  $neutron_host                  = '127.0.0.1',
+  $ovs_enable_tunneling          = true,
   $ovs_local_ip                  = false,
+  $neutron_firewall_driver       = false,
+  $bridge_mappings               = undef,
+  $bridge_uplinks                = undef,
+  $security_group_api            = 'neutron',
   # Nova
   $nova_admin_tenant_name        = 'services',
   $nova_admin_user               = 'nova',
@@ -57,6 +73,7 @@ class openstack::compute (
   $libvirt_vif_driver            = 'nova.virt.libvirt.vif.LibvirtGenericVIFDriver',
   # Rabbit
   $rabbit_host                   = '127.0.0.1',
+  $rabbit_hosts                  = false,
   $rabbit_user                   = 'openstack',
   $rabbit_virtual_host           = '/',
   # Glance
@@ -78,10 +95,12 @@ class openstack::compute (
   $setup_test_volume             = false,
   $cinder_rbd_user               = 'volumes',
   $cinder_rbd_pool               = 'volumes',
+  $cinder_rbd_secret_uuid        = false,
   # General
   $public_protocol               = 'http',
   $migration_support             = false,
   $verbose                       = false,
+  $force_config_drive            = false,
   $enabled                       = true
 ) {
 
@@ -120,6 +139,7 @@ class openstack::compute (
     glance_api_servers  => $glance_api_servers,
     verbose             => $verbose,
     rabbit_host         => $rabbit_host,
+    rabbit_hosts        => $rabbit_hosts,
     rabbit_virtual_host => $rabbit_virtual_host,
   }
 
@@ -129,6 +149,7 @@ class openstack::compute (
     vnc_enabled                   => $vnc_enabled,
     vncserver_proxyclient_address => $internal_address,
     vncproxy_host                 => $vncproxy_host,
+    force_config_drive            => $force_config_drive,
   }
 
   # Configure libvirt for nova-compute
@@ -140,7 +161,7 @@ class openstack::compute (
 
   # if the compute node should be configured as a multi-host
   # compute installation
-  if ! $quantum {
+  if ! $neutron {
 
     if ! $fixed_range {
       fail('Must specify the fixed range when using nova-networks')
@@ -184,50 +205,54 @@ class openstack::compute (
     }
   } else {
 
-    if ! $quantum_user_password {
-      fail('quantum_user_password must be set when quantum is configured')
+    if ! $neutron_user_password {
+      fail('neutron_user_password must be set when neutron is configured')
     }
     if ! $keystone_host {
-      fail('keystone_host must be configured when quantum is installed')
+      fail('keystone_host must be configured when neutron is installed')
     }
 
-    class { 'openstack::quantum':
+    class { 'openstack::neutron':
       # Database
-      db_host           => $db_host,
+      db_host              => $db_host,
       # Networking
-      ovs_local_ip      => $ovs_local_ip_real,
+      ovs_local_ip         => $ovs_local_ip_real,
       # Rabbit
-      rabbit_host       => $rabbit_host,
-      rabbit_user       => $rabbit_user,
-      rabbit_password   => $rabbit_password,
-      # Quantum OVS
-      enable_ovs_agent  => $enable_ovs_agent,
-      firewall_driver   => false,
-      # Quantum L3 Agent
-      enable_l3_agent   => $enable_l3_agent,
-      enable_dhcp_agent => $enable_dhcp_agent,
-      auth_url          => $quantum_auth_url,
-      user_password     => $quantum_user_password,
+      rabbit_host          => $rabbit_host,
+      rabbit_user          => $rabbit_user,
+      rabbit_password      => $rabbit_password,
+      # Neutron OVS
+      enable_ovs_agent     => $enable_ovs_agent,
+      ovs_enable_tunneling => $ovs_enable_tunneling,
+      firewall_driver      => $neutron_firewall_driver,
+      # Neutron L3 Agent
+      enable_l3_agent      => $enable_l3_agent,
+      enable_dhcp_agent    => $enable_dhcp_agent,
+      auth_url             => $neutron_auth_url,
+      user_password        => $neutron_user_password,
       # Keystone
-      keystone_host     => $keystone_host,
+      keystone_host        => $keystone_host,
       # General
-      enabled           => $enabled,
-      enable_server     => false,
-      verbose           => $verbose,
+      enabled              => $enabled,
+      enable_server        => false,
+      verbose              => $verbose,
+      bridge_mappings      => $bridge_mappings,
+      bridge_uplinks       => $bridge_uplinks
     }
 
-    class { 'nova::compute::quantum':
+    class { 'nova::compute::neutron':
       libvirt_vif_driver => $libvirt_vif_driver,
     }
 
-    # Configures nova.conf entries applicable to Quantum.
-    class { 'nova::network::quantum':
-      quantum_admin_password    => $quantum_user_password,
-      quantum_auth_strategy     => 'keystone',
-      quantum_url               => "${public_protocol}://${quantum_host}:9696",
-      quantum_admin_username    => $quantum_admin_user,
-      quantum_admin_tenant_name => $quantum_admin_tenant_name,
-      quantum_admin_auth_url    => "${public_protocol}://${keystone_host}:35357/v2.0",
+    # Configures nova.conf entries applicable to Neutron.
+    class { 'nova::network::neutron':
+      neutron_admin_password    => $neutron_user_password,
+      neutron_auth_strategy     => 'keystone',
+      neutron_url               => "${public_protocol}://${quantum_host}:9696",
+      neutron_admin_username    => $neutron_admin_user,
+      neutron_admin_tenant_name => $neutron_admin_tenant_name,
+      neutron_admin_auth_url    => "${public_protocol}://${keystone_host}:35357/v2.0",
+      security_group_api        => $security_group_api
     }
 
   }
@@ -253,6 +278,7 @@ class openstack::compute (
       setup_test_volume   => $setup_test_volume,
       rbd_user            => $cinder_rbd_user,
       rbd_pool            => $cinder_rbd_pool,
+      rbd_secret_uuid     => $cinder_rbd_secret_uuid,
       volume_driver       => $cinder_volume_driver,
     }
 

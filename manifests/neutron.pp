@@ -1,8 +1,8 @@
 #
-# == Class: openstack::quantum
+# == Class: openstack::neutron
 #
-# Class to define quantum components for openstack. This class can
-# be configured to provide all quantum related functionality.
+# Class to define neutron components for openstack. This class can
+# be configured to provide all neutron related functionality.
 #
 # === Parameters
 #
@@ -15,7 +15,7 @@
 #   (required)
 #
 # [enabled]
-#   state of the quantum services.
+#   state of the neutron services.
 #   (optional) Defaults to true.
 #
 # [enable_server]
@@ -59,7 +59,7 @@
 #    (optional) Defaults to '127.0.0.1'.
 #
 # [db_password]
-#   Password used to connect to quantum database.
+#   Password used to connect to neutron database.
 #   (required)
 #
 # [db_type]
@@ -68,11 +68,21 @@
 #
 # [ovs_local_ip]
 #   Ip address to use for tunnel endpoint.
-#   Only required when ovs is enabled. No default.
+#   Only required when tenant_network_type is 'gre'. No default.
 #
 # [ovs_enable_tunneling]
 #    Whether ovs tunnels should be enabled.
 #    (optional) Defaults to true.
+#
+# [tenant_network_type]
+#   Type of network to allocate for tenant networks
+#   Optional. Defualts to 'gre'.
+#
+# [network_vlan_ranges]
+#   Comma-separated list of <physical_network>[:<vlan_min>:<vlan_max>]
+#   tuples enumerating ranges of VLAN IDs on named physical networks
+#   that are available for allocation.
+#   Optional. Defaults to 'physnet1:1000:2000'.
 #
 # [firewall_driver]
 #   Firewall driver to use.
@@ -100,35 +110,39 @@
 #   (optional) Defaults to 127.0.0.1.
 #
 # [db_name]
-#   Name of quantum database.
-#   (optional) Defaults to quantum.
+#   Name of neutron database.
+#   (optional) Defaults to neutron.
 #
 # [db_user]
-#   User to connect to quantum database as.
-#   (optional) Defaults to quantum.
+#   User to connect to neutron database as.
+#   (optional) Defaults to neutron.
 #
 # [bind_address]
-#   Address quantum api server should bind to.
+#   Address neutron api server should bind to.
 #  (optional) Defaults to 0.0.0.0.
+#
+# [sql_idle_timeout]
+#   Timeout for sql to reap connections.
+#   (optional) Defaults to '3600'.
 #
 # [keystone_host]
 #   Host running keystone.
 #   (optional) Defaults to 127.0.0.1.
 #
 # [verbose]
-#   Enables verbose for quantum services.
+#   Enables verbose for neutron services.
 #   (optional) Defaults to false.
 #
 # [debug]
-#   Enables debug for quantum services.
+#   Enables debug for neutron services.
 #   (optional) Defaults to false.
 #
 # === Examples
 #
-# class { 'openstack::quantum':
-#   db_password           => 'quantum_db_pass',
+# class { 'openstack::neutron':
+#   db_password           => 'neutron_db_pass',
 #   user_password         => 'keystone_user_pass',
-#   rabbit_password       => 'quantum_rabbit_pass',
+#   rabbit_password       => 'neutron_rabbit_pass',
 #   bridge_uplinks        => '[br-ex:eth0]',
 #   bridge_mappings       => '[default:br-ex],
 #   enable_ovs_agent      => true,
@@ -136,11 +150,11 @@
 # }
 #
 
-class openstack::quantum (
+class openstack::neutron (
   # Passwords
   $user_password,
   $rabbit_password,
-  # enable or disable quantum
+  # enable or disable neutron
   $enabled                = true,
   $enable_server          = true,
   # Set DHCP/L3 Agents on Primary Controller
@@ -149,6 +163,8 @@ class openstack::quantum (
   $enable_metadata_agent  = false,
   $enable_ovs_agent       = false,
   # OVS settings
+  $tenant_network_type    = 'gre',
+  $network_vlan_ranges    = undef,
   $ovs_local_ip           = false,
   $ovs_enable_tunneling   = true,
   $bridge_uplinks         = [],
@@ -159,7 +175,7 @@ class openstack::quantum (
   # Metadata configuration
   $shared_secret          = false,
   $metadata_ip            = '127.0.0.1',
-  # Quantum Authentication Information
+  # Neutron Authentication Information
   $auth_url               = 'http://localhost:35357/v2.0',
   # Rabbit Information
   $rabbit_user            = 'rabbit_user',
@@ -170,8 +186,11 @@ class openstack::quantum (
   $db_type                = 'mysql',
   $db_password            = false,
   $db_host                = '127.0.0.1',
-  $db_name                = 'quantum',
-  $db_user                = 'quantum',
+  $db_name                = 'neutron',
+  $db_user                = 'neutron',
+  $sql_idle_timeout       = '3600',
+  # Plugin
+  $core_plugin            = undef,
   # General
   $bind_address           = '0.0.0.0',
   $keystone_host          = '127.0.0.1',
@@ -179,8 +198,9 @@ class openstack::quantum (
   $debug                  = false,
 ) {
 
-  class { '::quantum':
+  class { '::neutron':
     enabled             => $enabled,
+    core_plugin         => $core_plugin,
     bind_host           => $bind_address,
     rabbit_host         => $rabbit_host,
     rabbit_hosts        => $rabbit_hosts,
@@ -193,28 +213,27 @@ class openstack::quantum (
 
   if $enable_server {
     if ! $db_password {
-      fail('db password must be set when configuring a quantum server')
+      fail('db password must be set when configuring a neutron server')
     }
     if ($db_type == 'mysql') {
       $sql_connection = "mysql://${db_user}:${db_password}@${db_host}/${db_name}?charset=utf8"
     } else {
       fail("Unsupported db type: ${db_type}. Only mysql is currently supported.")
     }
-    class { 'quantum::server':
+    class { 'neutron::server':
       auth_host     => $keystone_host,
       auth_password => $user_password,
     }
-    class { 'quantum::plugins::ovs':
+    class { 'neutron::plugins::ovs':
       sql_connection      => $sql_connection,
-      tenant_network_type => 'gre',
+      sql_idle_timeout    => $sql_idle_timeout,
+      tenant_network_type => $tenant_network_type,
+      network_vlan_ranges => $network_vlan_ranges,
     }
   }
 
   if $enable_ovs_agent {
-    if ! $ovs_local_ip {
-      fail('ovs_local_ip parameter must be set when using ovs agent')
-    }
-    class { 'quantum::agents::ovs':
+    class { 'neutron::agents::ovs':
       bridge_uplinks   => $bridge_uplinks,
       bridge_mappings  => $bridge_mappings,
       enable_tunneling => $ovs_enable_tunneling,
@@ -224,13 +243,15 @@ class openstack::quantum (
   }
 
   if $enable_dhcp_agent {
-    class { 'quantum::agents::dhcp':
+    class { 'neutron::agents::dhcp':
       use_namespaces => true,
+      debug          => $debug,
     }
   }
   if $enable_l3_agent {
-    class { 'quantum::agents::l3':
+    class { 'neutron::agents::l3':
       use_namespaces => true,
+      debug          => $debug,
     }
   }
 
@@ -238,11 +259,12 @@ class openstack::quantum (
     if ! $shared_secret {
       fail('metadata_shared_secret parameter must be set when using metadata agent')
     }
-    class { 'quantum::agents::metadata':
+    class { 'neutron::agents::metadata':
       auth_password  => $user_password,
       shared_secret  => $shared_secret,
       auth_url       => $auth_url,
       metadata_ip    => $metadata_ip,
+      debug          => $debug,
     }
   }
 

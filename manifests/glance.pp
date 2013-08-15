@@ -15,10 +15,14 @@
 # [db_host] Host where DB resides. Required.
 # [keystone_host] Host whre keystone is running. Optional. Defaults to '127.0.0.1'
 # [sql_idle_timeout] Timeout for SQL to reap connections. Optional. Defaults to '3600'
+# [registry_host] Address used by API to find the Registry service. Optional. Defaults to '0.0.0.0'
+# [bind_host] Address for binding API and Registry services. Optional. Defaults to '0.0.0.0'
 # [db_type] Type of sql databse to use. Optional. Defaults to 'mysql'
 # [db_user] Name of glance DB user. Optional. Defaults to 'glance'
 # [db_name] Name of glance DB. Optional. Defaults to 'glance'
 # [backend] Backends used to store images.  Defaults to file.
+# [rbd_store_user] The RBD store user name.
+# [rbd_store_pool] The RBD pool name to store images.
 # [swift_store_user] The Swift service user account. Defaults to false.
 # [swift_store_key]  The Swift service user password Defaults to false.
 # [swift_store_auth_addres] The URL where the Swift auth service lives. Defaults to "http://${keystone_host}:5000/v2.0/"
@@ -41,6 +45,8 @@ class openstack::glance (
   $db_host                  = '127.0.0.1',
   $keystone_host            = '127.0.0.1',
   $sql_idle_timeout         = '3600',
+  $registry_host            = '0.0.0.0',
+  $bind_host                = '0.0.0.0',
   $db_type                  = 'mysql',
   $db_user                  = 'glance',
   $db_name                  = 'glance',
@@ -48,6 +54,8 @@ class openstack::glance (
   $swift_store_user         = false,
   $swift_store_key          = false,
   $swift_store_auth_address = 'http://127.0.0.1:5000/v2.0/',
+  $rbd_store_user           = undef,
+  $rbd_store_pool           = 'images',
   $verbose                  = false,
   $debug                    = false,
   $enabled                  = true
@@ -64,6 +72,8 @@ class openstack::glance (
   class { 'glance::api':
     verbose           => $verbose,
     debug             => $debug,
+    registry_host     => $registry_host,
+    bind_host         => $bind_host,
     auth_type         => 'keystone',
     auth_port         => '35357',
     auth_host         => $keystone_host,
@@ -79,6 +89,7 @@ class openstack::glance (
   class { 'glance::registry':
     verbose           => $verbose,
     debug             => $debug,
+    bind_host         => $bind_host,
     auth_host         => $keystone_host,
     auth_port         => '35357',
     auth_type         => 'keystone',
@@ -86,6 +97,7 @@ class openstack::glance (
     keystone_user     => 'glance',
     keystone_password => $user_password,
     sql_connection    => $sql_connection,
+    sql_idle_timeout  => $sql_idle_timeout,
     enabled           => $enabled,
   }
 
@@ -108,6 +120,11 @@ class openstack::glance (
   } elsif($backend == 'file') {
   # Configure file storage backend
     class { 'glance::backend::file': }
+  } elsif($backend == 'rbd') {
+    class { 'glance::backend::rbd':
+      rbd_store_user => $rbd_store_user,
+      rbd_store_pool => $rbd_store_pool,
+    }
   } else {
     fail("Unsupported backend ${backend}")
   }

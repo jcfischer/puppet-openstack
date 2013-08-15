@@ -7,17 +7,18 @@
 #
 # [db_host] Host where DB resides. Optional. Defaults to 127.0.0.1..
 # [idle_timeout] Timeout to reap SQL connections. Optional. Defaults to '200'.
-# [keystone_db_password] Password for keystone DB. Required.
-# [keystone_admin_token]. Auth token for keystone admin. Required.
+# [db_password] Password for keystone DB. Required.
+# [admin_token]. Auth token for keystone admin. Required.
 # [admin_email] Email address of system admin. Required.
-# [admin_password]
+# [admin_password] Auth password for admin user. Required.
 # [glance_user_password] Auth password for glance user. Required.
 # [nova_user_password] Auth password for nova user. Required.
 # [public_address] Public address where keystone can be accessed. Required.
+# [public_protocol] Public protocol over which keystone can be accessed. Defaults to 'http'
 # [db_type] Type of DB used. Currently only supports mysql. Optional. Defaults to  'mysql'
-# [keystone_db_user] Name of keystone db user. Optional. Defaults to  'keystone'
-# [keystone_db_dbname] Name of keystone DB. Optional. Defaults to  'keystone'
-# [keystone_admin_tenant] Name of keystone admin tenant. Optional. Defaults to  'admin'
+# [db_user] Name of keystone db user. Optional. Defaults to  'keystone'
+# [db_name] Name of keystone DB. Optional. Defaults to  'keystone'
+# [admin_tenant] Name of keystone admin tenant. Optional. Defaults to  'admin'
 # [verbose] Log verbosely. Optional. Defaults to false.
 # [debug] Log at a debug-level. Optional. Defaults to false.
 # [bind_host] Address that keystone binds to. Optional. Defaults to  '0.0.0.0'
@@ -36,10 +37,14 @@
 #
 # class { 'openstack::keystone':
 #   db_host               => '127.0.0.1',
-#   keystone_db_password  => 'changeme',
-#   keystone_admin_token  => '12345',
+#   db_password           => 'changeme',
+#   admin_token           => '12345',
 #   admin_email           => 'root@localhost',
 #   admin_password        => 'changeme',
+#   glance_user_password  => 'glance',
+#   nova_user_password    => 'nova',
+#   cinder_user_password  => 'cinder',
+#   neutron_user_password => 'neutron',
 #   public_address        => '192.168.1.1',
 #  }
 
@@ -51,8 +56,9 @@ class openstack::keystone (
   $glance_user_password,
   $nova_user_password,
   $cinder_user_password,
-  $quantum_user_password,
+  $neutron_user_password,
   $public_address,
+  $public_protocol          = 'http',
   $db_host                  = '127.0.0.1',
   $idle_timeout             = '200',
   $swift_user_password      = false,
@@ -76,16 +82,16 @@ class openstack::keystone (
   $cinder_public_address    = false,
   $cinder_internal_address  = false,
   $cinder_admin_address     = false,
-  $quantum_public_address   = false,
-  $quantum_internal_address = false,
-  $quantum_admin_address    = false,
+  $neutron_public_address   = false,
+  $neutron_internal_address = false,
+  $neutron_admin_address    = false,
   $swift_public_address     = false,
   $swift_internal_address   = false,
   $swift_admin_address      = false,
   $glance                   = true,
   $nova                     = true,
   $cinder                   = true,
-  $quantum                  = true,
+  $neutron                  = true,
   $swift                    = false,
   $enabled                  = true,
 
@@ -161,20 +167,20 @@ class openstack::keystone (
   } else {
     $cinder_admin_real = $cinder_internal_real
   }
-  if($quantum_public_address) {
-    $quantum_public_real = $quantum_public_address
+  if($neutron_public_address) {
+    $neutron_public_real = $neutron_public_address
   } else {
-    $quantum_public_real = $public_address
+    $neutron_public_real = $public_address
   }
-  if($quantum_internal_address) {
-    $quantum_internal_real = $quantum_internal_address
+  if($neutron_internal_address) {
+    $neutron_internal_real = $neutron_internal_address
   } else {
-    $quantum_internal_real = $quantum_public_real
+    $neutron_internal_real = $neutron_public_real
   }
-  if($quantum_admin_address) {
-    $quantum_admin_real = $quantum_admin_address
+  if($neutron_admin_address) {
+    $neutron_admin_real = $neutron_admin_address
   } else {
-    $quantum_admin_real = $quantum_internal_real
+    $neutron_admin_real = $neutron_internal_real
   }
   if($swift_public_address) {
     $swift_public_real = $swift_public_address
@@ -263,6 +269,7 @@ class openstack::keystone (
     # Setup the Keystone Identity Endpoint
     class { 'keystone::endpoint':
       public_address   => $public_address,
+      public_protocol  => $public_protocol,
       admin_address    => $admin_real,
       internal_address => $internal_real,
       region           => $region,
@@ -274,6 +281,7 @@ class openstack::keystone (
       class { 'glance::keystone::auth':
         password         => $glance_user_password,
         public_address   => $glance_public_real,
+        public_protocol  => $public_protocol,
         admin_address    => $glance_admin_real,
         internal_address => $glance_internal_real,
         region           => $region,
@@ -286,6 +294,7 @@ class openstack::keystone (
       class { 'nova::keystone::auth':
         password         => $nova_user_password,
         public_address   => $nova_public_real,
+        public_protocol  => $public_protocol,
         admin_address    => $nova_admin_real,
         internal_address => $nova_internal_real,
         region           => $region,
@@ -300,18 +309,20 @@ class openstack::keystone (
       class { 'cinder::keystone::auth':
         password         => $cinder_user_password,
         public_address   => $cinder_public_real,
+        public_protocol  => $public_protocol,
         admin_address    => $cinder_admin_real,
         internal_address => $cinder_internal_real,
         region           => $region,
         public_protocol  => $public_protocol,
       }
     }
-    if $quantum {
-      class { 'quantum::keystone::auth':
-        password         => $quantum_user_password,
-        public_address   => $quantum_public_real,
-        admin_address    => $quantum_admin_real,
-        internal_address => $quantum_internal_real,
+    if $neutron {
+      class { 'neutron::keystone::auth':
+        password         => $neutron_user_password,
+        public_address   => $neutron_public_real,
+        public_protocol  => $public_protocol,
+        admin_address    => $neutron_admin_real,
+        internal_address => $neutron_internal_real,
         region           => $region,
         public_protocol  => $public_protocol,
       }
@@ -326,6 +337,7 @@ class openstack::keystone (
       class { 'swift::keystone::auth':
         password         => $swift_user_password,
         public_address   => $swift_public_real,
+        public_protocol  => $public_protocol,
         admin_address    => $swift_admin_real,
         internal_address => $swift_internal_real,
         address          => $swift_public_real,

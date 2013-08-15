@@ -3,7 +3,7 @@ class openstack::cinder::storage(
   $rabbit_password,
   $rabbit_userid         = 'guest',
   $rabbit_host           = '127.0.0.1',
-  $rabbit_hosts          = undef,
+  $rabbit_hosts          = false,
   $rabbit_port           = '5672',
   $rabbit_virtual_host   = '/',
   $package_ensure        = 'present',
@@ -13,9 +13,11 @@ class openstack::cinder::storage(
   $enabled               = true,
   $rbd_user              = 'volumes',
   $rbd_pool              = 'volumes',
+  $rbd_secret_uuid       = false,
   $volume_driver         = 'iscsi',
   $iscsi_ip_address      = '127.0.0.1',
   $setup_test_volume     = false,
+  $debug                 = false,
   $verbose               = false
 ) {
 
@@ -29,6 +31,7 @@ class openstack::cinder::storage(
     rabbit_virtual_host => $rabbit_virtual_host,
     package_ensure      => $package_ensure,
     api_paste_config    => $api_paste_config,
+    debug               => $debug,
     verbose             => $verbose,
   }
 
@@ -52,10 +55,11 @@ class openstack::cinder::storage(
       }
     }
     'rbd': {
-      class { 'cinder::volume::rbd':
-        rbd_user => $cinder_rbd_user,
-        rbd_pool => $cinder_rbd_pool,
 
+      class { 'cinder::volume::rbd':
+        rbd_user        => $rbd_user,
+        rbd_pool        => $rbd_pool,
+        rbd_secret_uuid => $rbd_secret_uuid,
       }
     }
     default:  {
