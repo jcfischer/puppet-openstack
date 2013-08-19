@@ -75,12 +75,10 @@ describe 'openstack::auth_file' do
     end
 
     it 'should create a openrc file' do
-      puts subject.resource('file', '/root/openrc').send(:parameters)[:content]
-
       verify_contents(subject, '/root/openrc', [
-            'export OS_NO_CACHE=false',
             'export OS_SERVICE_TOKEN=keystone',
             'export OS_SERVICE_ENDPOINT=https://127.0.0.2:35357/v2.0/',
+            'export OS_NO_CACHE=false',
             'export OS_TENANT_NAME=nova',
             'export OS_USERNAME=nova',
             'export OS_PASSWORD=nova',
