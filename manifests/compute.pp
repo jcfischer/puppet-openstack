@@ -244,11 +244,11 @@ class openstack::compute (
       libvirt_vif_driver => $libvirt_vif_driver,
     }
 
-    # Configures nova.conf entries applicable to Neutron.
+    # Configures nova.conf entries applicable to Neutron
     class { 'nova::network::neutron':
       neutron_admin_password    => $neutron_user_password,
       neutron_auth_strategy     => 'keystone',
-      neutron_url               => "${public_protocol}://${quantum_host}:9696",
+      neutron_url               => "${public_protocol}://${neutron_host}:9696",
       neutron_admin_username    => $neutron_admin_user,
       neutron_admin_tenant_name => $neutron_admin_tenant_name,
       neutron_admin_auth_url    => "${public_protocol}://${keystone_host}:35357/v2.0",

@@ -5,7 +5,6 @@
 #
 # [public_interface] Public interface used to route public traffic. Required.
 # [public_address] Public address for public endpoints. Required.
-# [public_protocol] Protocol used by public endpoints. Defaults to 'http'
 # [private_interface] Interface used for vm networking connectivity. Required.
 # [internal_address] Internal address used for management. Required.
 # [mysql_root_password] Root password for mysql server.
@@ -22,7 +21,7 @@
 # [keyfile] The path/filename for the SSL key file
 # [ca_certs] The path/filename for the SSL CA file
 # [cert_required] use client certificates for connecting
-# [public_protocol] set to https if SSL is enabled
+# [public_protocol] Protocol used by public endpoints, set to https if SSL is enabled
 # [glance_registry_host] Address used by Glance API to find the Glance Registry service.
 #   Optional. Defaults to '0.0.0.0'.
 # [glance_db_password] Glance DB password.
@@ -382,7 +381,6 @@ class openstack::controller (
     keyfile                   => $keyfile,
     ca_certs                  => $ca_certs,
     cert_required             => $cert_required,
-    public_protocol           => $public_protocol,
   }
 
 

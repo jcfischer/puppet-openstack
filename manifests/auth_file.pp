@@ -33,6 +33,8 @@
 #   (optional) Defaults to 'publicURL'.
 # [*neutron_endpoint_type*]
 #   (optional) Defaults to 'publicURL'.
+# [*public_protocol*]
+#   (optional) set to 'https' if keystone uses SSL. Defaults to 'http'
 #
 class openstack::auth_file(
   $admin_password,
@@ -48,6 +50,7 @@ class openstack::auth_file(
   $keystone_endpoint_type   = 'publicURL',
   $nova_endpoint_type       = 'publicURL',
   $neutron_endpoint_type    = 'publicURL',
+  $public_protocol          = 'http',
 ) {
 
   file { '/root/openrc':

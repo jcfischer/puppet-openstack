@@ -75,18 +75,27 @@ describe 'openstack::auth_file' do
     end
 
     it 'should create a openrc file' do
-      should contain_file('/root/openrc').with_content(
-                 '
-  export OS_NO_CACHE=false
-  export OS_TENANT_NAME=nova
-  export OS_USERNAME=nova
-  export OS_PASSWORD=\'nova\'
-  export OS_AUTH_URL="https://127.0.0.2:5000/v2.0/"
-  export OS_AUTH_STRATEGY=keystone
-  export SERVICE_TOKEN=keystone
-  export SERVICE_ENDPOINT=https://127.0.0.2:35357/v2.0/
-  '
-             )
+      puts subject.resource('file', '/root/openrc').send(:parameters)[:content]
+
+      verify_contents(subject, '/root/openrc', [
+            'export OS_NO_CACHE=false',
+            'export OS_SERVICE_TOKEN=keystone',
+            'export OS_SERVICE_ENDPOINT=https://127.0.0.2:35357/v2.0/',
+            'export OS_TENANT_NAME=nova',
+            'export OS_USERNAME=nova',
+            'export OS_PASSWORD=nova',
+            'export OS_AUTH_URL=https://127.0.0.2:5000/v2.0/',
+            'export OS_AUTH_STRATEGY=keystone',
+            'export OS_REGION_NAME=RegionOne',
+            'export CINDER_ENDPOINT_TYPE=publicURL',
+            'export GLANCE_ENDPOINT_TYPE=publicURL',
+            'export KEYSTONE_ENDPOINT_TYPE=publicURL',
+            'export NOVA_ENDPOINT_TYPE=publicURL',
+            'export NEUTRON_ENDPOINT_TYPE=publicURL'
+
+        ])
     end
+
+
   end
 end
